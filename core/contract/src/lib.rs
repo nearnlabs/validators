@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
     conflict_count: u128,
+    conflict_valid_count: u128,
+    conflict_invalid_count: u128,
     conflict_props: BTreeMap<u128, u128>,
     conflict_votes: BTreeMap<u128, Vec<(AccountId, bool)>>,
     conflict_fate: BTreeMap<u128, bool>,
@@ -21,6 +23,8 @@ impl Default for Contract{
     fn default() -> Self{
         Self{
             conflict_count: 0, 
+            conflict_valid_count: 0,
+            conflict_invalid_count: 0,
             conflict_props: BTreeMap::new(), 
             conflict_votes: BTreeMap::new(), 
             conflict_fate: BTreeMap::new(), 
@@ -94,10 +98,12 @@ impl Contract {
         }
         if 2 * upvotes >= votes_vec.clone().len().try_into().unwrap(){
             self.conflict_fate.insert(conflict_id, true);
+            self.conflict_valid_count += 1;
             return true;
         }
         else {
             self.conflict_fate.insert(conflict_id, false);
+            self.conflict_invalid_count += 1;
             return false;
         }
         
