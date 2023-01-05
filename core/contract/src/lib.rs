@@ -12,6 +12,7 @@ pub struct Contract {
     conflict_count: u128,
     conflict_valid_count: u128,
     conflict_invalid_count: u128,
+    conflict_null_count: u128,
     conflict_props: BTreeMap<u128, u128>,
     conflict_votes: BTreeMap<u128, Vec<(AccountId, bool)>>,
     conflict_fate: BTreeMap<u128, bool>,
@@ -25,6 +26,7 @@ impl Default for Contract{
             conflict_count: 0, 
             conflict_valid_count: 0,
             conflict_invalid_count: 0,
+            conflict_null_count: 0,
             conflict_props: BTreeMap::new(), 
             conflict_votes: BTreeMap::new(), 
             conflict_fate: BTreeMap::new(), 
@@ -96,6 +98,7 @@ impl Contract {
                 upvotes += 1;
             }
         }
+        assert!(upvotes != 0);
         if 2 * upvotes >= votes_vec.clone().len().try_into().unwrap(){
             self.conflict_fate.insert(conflict_id, true);
             self.conflict_valid_count += 1;
@@ -106,6 +109,33 @@ impl Contract {
             self.conflict_invalid_count += 1;
             return false;
         }
+        
+        
+    }
+
+    // Public method - nullification of the conflict instance by the lead validator if no votes cast
+    pub fn null_conflict(&mut self, conflict_id: u128) -> bool{
+        let conflict_exists = self.conflict_props.get(&conflict_id);
+        assert!(!conflict_exists.is_none(), "Conflict does not Exist");
+        let conflict_status = self.conflict_fate.get(&conflict_id);
+        assert!(conflict_status.is_none(), "Conflict has Already Been Resolved!");
+        let caller: AccountId = env::predecessor_account_id();
+        assert_eq!(caller, "harry.near".parse().unwrap(), "Unauthorized Lead Validator");
+        log!("Closing Conflict: {}", conflict_id);
+        let votes_vec = self.conflict_votes.get(&conflict_id).unwrap().clone();
+        let mut upvotes : u128 = 0;
+        for item in votes_vec.clone() {
+            if item.1 {
+                upvotes += 1;
+            }
+        }
+        assert!(upvotes == 0);
+        
+        self.conflict_fate.insert(conflict_id, false);
+        self.conflict_null_count += 1;
+        return true;
+        
+        
         
         
     }
@@ -182,6 +212,21 @@ mod tests {
         contract.vote_on_conflict(1, true);
         set_context(acc1.clone(), 10*NEAR);
         let result = contract.close_conflict(1);
+        assert_eq!(
+            result,
+            true
+        );
+       
+    }
+
+    #[test]
+    fn test_null_conflict() {
+        let mut contract = Contract::default();
+        let acc1: AccountId = "harry.near".parse().unwrap();
+        set_context(acc1.clone(), 10*NEAR);
+        contract.create_conflict(6);
+        
+        let result = contract.null_conflict(1);
         assert_eq!(
             result,
             true
